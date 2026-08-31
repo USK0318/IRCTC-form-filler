@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="head">
+      <span class="title">IRCTC Passengers</span>
+    </div>
+
+    <div class="intro">
+      Add and save your passengers. On the IRCTC passenger page, open the panel
+      and pick who to fill.
+    </div>
+
+    <div id="list"></div>
+
+    <div class="form">
+      <div class="form-title" id="form-title">Add passenger</div>
+      <input type="hidden" id="edit-index" value="-1" />
+      <input id="f-name" class="inp" type="text" placeholder="Full name (as per Govt. ID)" />
+      <div class="row">
+        <input id="f-age" class="inp small" type="number" min="1" max="125" placeholder="Age" />
+        <select id="f-gender" class="inp">
+          <option value="">Gender</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Transgender">Transgender</option>
+        </select>
+      </div>
+      <div class="row">
+        <select id="f-berth" class="inp">
+          <option value="">No Preference</option>
+          <option value="Lower">Lower</option>
+          <option value="Middle">Middle</option>
+          <option value="Upper">Upper</option>
+          <option value="Side Lower">Side Lower</option>
+          <option value="Side Upper">Side Upper</option>
+        </select>
+        <input id="f-nat" class="inp" type="text" placeholder="Country" value="India" />
+      </div>
+      <div class="actions">
+        <button id="save" class="btn primary">Save passenger</button>
+        <button id="cancel" class="btn" style="display:none">Cancel</button>
+      </div>
+      <div id="msg" class="msg"></div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

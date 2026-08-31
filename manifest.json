@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "IRCTC Form Filler",
+  "version": "1.0.0",
+  "description": "Auto-fills the IRCTC passenger booking form: passengers, auto-upgradation, BHIM/UPI payment, and Continue.",
+  "permissions": ["storage"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "IRCTC Form Filler"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.irctc.co.in/nget/*"],
+      "js": ["content.js"],
+      "css": ["panel.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
