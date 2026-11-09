@@ -1,52 +1,234 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <link rel="stylesheet" href="popup.css" />
-  </head>
-  <body>
-    <div class="head">
-      <span class="title">IRCTC Passengers</span>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IRCTC Smart Filler</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="app-header">
+    <img src="icons/icon48.png" alt="" class="logo" width="28" height="28" />
+    <div class="brand">
+      <h1>IRCTC Smart Filler</h1>
+      <p id="page-status" class="page-status" data-state="unknown">Checking page…</p>
     </div>
+  </header>
 
-    <div class="intro">
-      Add and save your passengers. On the IRCTC passenger page, open the panel
-      and pick who to fill.
-    </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" class="tab active" data-tab="book" aria-selected="true">Book</button>
+    <button role="tab" class="tab" data-tab="passengers" aria-selected="false">Passengers</button>
+    <button role="tab" class="tab" data-tab="groups" aria-selected="false">Groups</button>
+    <button role="tab" class="tab" data-tab="settings" aria-selected="false">Settings</button>
+  </nav>
 
-    <div id="list"></div>
+  <main>
+    <!-- ============================ BOOK ============================ -->
+    <section id="tab-book" class="panel" role="tabpanel">
+      <div class="card">
+        <div class="seg" role="radiogroup" aria-label="Choose passengers by">
+          <label><input type="radio" name="sel-mode" value="passengers" checked /><span>Pick passengers</span></label>
+          <label><input type="radio" name="sel-mode" value="group" /><span>Use a group</span></label>
+        </div>
 
-    <div class="form">
-      <div class="form-title" id="form-title">Add passenger</div>
-      <input type="hidden" id="edit-index" value="-1" />
-      <input id="f-name" class="inp" type="text" placeholder="Full name (as per Govt. ID)" />
-      <div class="row">
-        <input id="f-age" class="inp small" type="number" min="1" max="125" placeholder="Age" />
-        <select id="f-gender" class="inp">
-          <option value="">Gender</option>
-          <option value="Male">Male</option>
-          <option value="Female">Female</option>
-          <option value="Transgender">Transgender</option>
-        </select>
+        <div id="sel-group-wrap" hidden>
+          <label class="field">
+            <span>Saved group</span>
+            <select id="sel-group"></select>
+          </label>
+        </div>
+
+        <div id="sel-list" class="check-list" aria-label="Passengers for this booking"></div>
+        <p id="sel-summary" class="hint"></p>
       </div>
-      <div class="row">
-        <select id="f-berth" class="inp">
-          <option value="">No Preference</option>
-          <option value="Lower">Lower</option>
-          <option value="Middle">Middle</option>
-          <option value="Upper">Upper</option>
-          <option value="Side Lower">Side Lower</option>
-          <option value="Side Upper">Side Upper</option>
-        </select>
-        <input id="f-nat" class="inp" type="text" placeholder="Country" value="India" />
-      </div>
+
       <div class="actions">
-        <button id="save" class="btn primary">Save passenger</button>
-        <button id="cancel" class="btn" style="display:none">Cancel</button>
+        <button id="btn-fill" class="btn primary">Fill Form</button>
+        <button id="btn-clear" class="btn ghost">Clear Form</button>
       </div>
-      <div id="msg" class="msg"></div>
-    </div>
 
-    <script src="popup.js"></script>
-  </body>
+      <div id="result" class="card result" hidden>
+        <div class="result-head">
+          <strong id="result-title">Result</strong>
+          <span id="result-pills" class="pills"></span>
+        </div>
+        <ul id="result-list" class="result-list"></ul>
+        <p class="hint strong">You review the page and click <b>Continue</b> yourself. Payment is never started by this extension.</p>
+      </div>
+    </section>
+
+    <!-- ========================= PASSENGERS ========================= -->
+    <section id="tab-passengers" class="panel" role="tabpanel" hidden>
+      <div id="passenger-list" class="list"></div>
+      <button id="btn-add-passenger" class="btn primary block">+ Add Passenger</button>
+
+      <form id="passenger-form" class="card form" hidden novalidate>
+        <h2 id="pf-title">Add Passenger</h2>
+        <input type="hidden" id="pf-id" />
+        <label class="field">
+          <span>Type</span>
+          <select id="pf-type"></select>
+        </label>
+        <label class="field">
+          <span>Full name <small>(as per Government ID)</small></span>
+          <input id="pf-name" maxlength="16" autocomplete="off" spellcheck="false" />
+          <em class="err" data-for="name"></em>
+        </label>
+        <div class="row2">
+          <label class="field">
+            <span>Age</span>
+            <input id="pf-age" type="number" min="0" max="125" inputmode="numeric" />
+            <em class="err" data-for="age"></em>
+          </label>
+          <label class="field">
+            <span>Gender</span>
+            <select id="pf-gender"></select>
+            <em class="err" data-for="gender"></em>
+          </label>
+        </div>
+        <label class="field">
+          <span>Nationality</span>
+          <input id="pf-nationality" list="nationality-list" value="India" autocomplete="off" />
+          <datalist id="nationality-list"></datalist>
+          <em class="err" data-for="nationality"></em>
+        </label>
+        <div class="row2" id="pf-berth-food">
+          <label class="field">
+            <span>Berth preference</span>
+            <select id="pf-berth"></select>
+          </label>
+          <label class="field">
+            <span>Food <small>(if offered)</small></span>
+            <select id="pf-food"></select>
+          </label>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn primary">Save Profile</button>
+          <button type="button" id="pf-cancel" class="btn ghost">Cancel</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- =========================== GROUPS =========================== -->
+    <section id="tab-groups" class="panel" role="tabpanel" hidden>
+      <p class="hint">Save passenger combinations (e.g. “Family”, “Parents”) and pick one when booking. Order here = order on IRCTC.</p>
+      <div id="group-list" class="list"></div>
+      <button id="btn-add-group" class="btn primary block">+ New Group</button>
+
+      <form id="group-form" class="card form" hidden novalidate>
+        <h2 id="gf-title">New Group</h2>
+        <input type="hidden" id="gf-id" />
+        <label class="field">
+          <span>Group name</span>
+          <input id="gf-name" maxlength="40" autocomplete="off" />
+          <em class="err" data-for="name"></em>
+        </label>
+        <div class="field">
+          <span>Passengers</span>
+          <div id="gf-members" class="check-list"></div>
+          <em class="err" data-for="passengerIds"></em>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn primary">Save Group</button>
+          <button type="button" id="gf-cancel" class="btn ghost">Cancel</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ========================== SETTINGS ========================== -->
+    <section id="tab-settings" class="panel" role="tabpanel" hidden>
+      <form id="settings-form" novalidate>
+        <div class="card form">
+          <h2>Contact information</h2>
+          <div class="row2">
+            <label class="field">
+              <span>Mobile number</span>
+              <input id="st-mobile" inputmode="tel" maxlength="14" autocomplete="off" />
+              <em class="err" data-for="mobile"></em>
+            </label>
+            <label class="field">
+              <span>Email</span>
+              <input id="st-email" type="email" autocomplete="off" />
+              <em class="err" data-for="email"></em>
+            </label>
+          </div>
+          <label class="check">
+            <input type="checkbox" id="st-overwrite" />
+            <span>Overwrite contact details IRCTC has already filled</span>
+          </label>
+        </div>
+
+        <div class="card form">
+          <h2>Other preferences</h2>
+          <label class="check"><input type="checkbox" id="st-autoupgrade" /><span>Consider for Auto Upgradation</span></label>
+          <label class="check"><input type="checkbox" id="st-confirm" /><span>Book only if confirm berths are allotted</span></label>
+          <label class="field">
+            <span>Reservation choice</span>
+            <select id="st-reservation"></select>
+          </label>
+          <label class="field">
+            <span>Preferred coach number <small>(optional)</small></span>
+            <input id="st-coach" maxlength="4" placeholder="e.g. B2" autocomplete="off" />
+            <em class="err" data-for="coach"></em>
+          </label>
+        </div>
+
+        <div class="card form">
+          <h2>Travel insurance</h2>
+          <div id="st-insurance" class="radio-list"></div>
+        </div>
+
+        <div class="card form">
+          <h2>Payment mode</h2>
+          <div id="st-payment" class="radio-list"></div>
+          <p class="hint">Only the payment-mode option is selected. Payment is never started and no payment details are stored.</p>
+        </div>
+
+        <div class="card form">
+          <h2>After filling</h2>
+          <label class="check">
+            <input type="checkbox" id="st-autocontinue" />
+            <span>Click <b>Continue</b> on the Passenger and Review pages (only when every field filled without problems)</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="st-gateway" />
+            <span>On the Payment page, select this payment method</span>
+          </label>
+          <div class="row2">
+            <label class="field">
+              <span>Method</span>
+              <select id="st-gw-category"></select>
+            </label>
+            <label class="field">
+              <span>Option</span>
+              <input id="st-gw-option" list="gw-option-list" autocomplete="off" />
+              <datalist id="gw-option-list"></datalist>
+            </label>
+          </div>
+          <p class="hint">It stops before <b>Pay &amp; Book</b>, which you always click yourself. If a CAPTCHA appears, type it and click Continue yourself; the payment method is still picked on the next page.</p>
+        </div>
+
+        <div class="card form">
+          <h2>On the IRCTC page</h2>
+          <label class="check">
+            <input type="checkbox" id="st-autopanel" />
+            <span>Open the filler panel automatically on the Passenger Details page</span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn primary block">Save Settings</button>
+      </form>
+
+      <div class="card danger">
+        <h2>Privacy</h2>
+        <p class="hint">All data stays in this browser (chrome.storage.local). Nothing is sent anywhere. Passwords, OTPs, card details and UPI PINs are never stored.</p>
+        <button id="btn-wipe" class="btn danger-btn block">Delete all saved data</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script type="module" src="popup.js"></script>
+</body>
 </html>

@@ -1,0 +1,336 @@
+<!doctype html>
+<!--
+  Local MOCK of the IRCTC passenger page for testing the content script.
+  It imitates IRCTC's Angular + PrimeNG markup (formcontrolname attributes,
+  p-autocomplete / p-dropdown / p-checkbox / p-radiobutton widgets, add-row
+  links) and keeps a "model" that only updates from real DOM events — the
+  same way Angular's value accessors do. It is NOT the real IRCTC page.
+  Serve the repo root (python3 -m http.server 8765) and open
+  http://localhost:8765/test/mock/nget/booking/psgninput/
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MOCK IRCTC Passenger Details</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
+  .box { background: #fff; padding: 12px; margin-bottom: 12px; border: 1px solid #ddd; }
+  .ui-g { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+  .prenext { color: #213d77; cursor: pointer; font-weight: bold; }
+  .ui-chkbox-box, .ui-radiobutton-box { display: inline-block; width: 16px; height: 16px; border: 1px solid #333; cursor: pointer; vertical-align: middle; }
+  .ui-chkbox-box.ui-state-active, .ui-radiobutton-box.ui-state-active { background: #213d77; }
+  .ui-radiobutton-box { border-radius: 50%; }
+  .ui-helper-hidden-accessible { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .ui-dropdown { display: inline-block; min-width: 260px; border: 1px solid #999; padding: 4px; cursor: pointer; position: relative; background: #fff; }
+  .ui-dropdown-panel { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #999; z-index: 5; }
+  .ui-dropdown-item { padding: 4px; } .ui-dropdown-item:hover { background: #eee; }
+  .ui-autocomplete-panel { position: absolute; background: #fff; border: 1px solid #999; z-index: 5; }
+  #model { white-space: pre; font: 11px monospace; background: #222; color: #9f9; padding: 8px; }
+</style>
+</head>
+<body>
+<div id="clock" style="font-weight:bold"></div>
+<div id="preloaders" class="loading" hidden style="position:fixed;inset:0;background:rgba(255,255,255,.6);display:grid;place-items:center;z-index:1000">Loading…</div>
+<h3>Passenger Details (MOCK)</h3>
+<form id="psgn-form">
+  <div class="box">
+    <div id="passenger-rows"></div>
+    <a id="add-psgn"><span class="prenext">+ Add Passenger / Add Infant With Berth</span></a>
+    <div id="infant-rows"></div>
+    <a id="add-infant"><span class="prenext">+ Add Infant Without Berth</span></a>
+  </div>
+
+  <div class="box">
+    <span>Contact Details</span>
+    <div class="ui-g"><input id="mobileNumber" formcontrolname="mobileNumber" placeholder="Passenger mobile number *" value="9876500000" type="text"></div>
+  </div>
+
+  <div class="box">
+    <span>Other Preferences</span>
+    <div class="ui-g">
+      <input type="checkbox" id="autoUpgradation" formcontrolname="autoUpgradationSelected">
+      <label for="autoUpgradation">Consider for Auto Upgradation.</label>
+    </div>
+    <div class="ui-g">
+      <p-checkbox formcontrolname="bookOnlyIfCnf" label="Book only if confirm berths are allotted.">
+        <div class="ui-chkbox ui-widget"><div class="ui-helper-hidden-accessible"><input type="checkbox"></div>
+        <div class="ui-chkbox-box ui-widget ui-state-default"></div></div>
+        <label class="ui-chkbox-label">Book only if confirm berths are allotted.</label>
+      </p-checkbox>
+    </div>
+    <div class="ui-g">
+      <p-dropdown formcontrolname="reservationChoice" placeholder="Reservation Choice" id="resChoice"></p-dropdown>
+    </div>
+    <div class="ui-g">
+      <input formcontrolname="coachId" placeholder="Preferred Coach Number" maxlength="4">
+    </div>
+  </div>
+
+  <div class="box">
+    <span>Travel Insurance (Incl. of GST)</span>
+    <div class="ui-g" id="ins"></div>
+  </div>
+
+  <div class="box">
+    <span>Payment Mode</span>
+    <div class="ui-g" id="pay"></div>
+  </div>
+
+  <button type="button" id="continueBtn" class="train_Search">Continue</button>
+</form>
+<!-- Review Journey (shown after Continue, URL changes via pushState like the real SPA) -->
+<div id="review" class="box" hidden>
+  <h3>Review Journey (MOCK)</h3>
+  <div id="review-summary"></div>
+  <div id="captcha-wrap" hidden><img alt="captcha" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="120" height="30" style="background:#ccc"> <input id="captcha" formcontrolname="captcha" placeholder="Enter Captcha"></div>
+  <a href="#" onclick="return false">View Cancellation Policy</a>
+  <div><button type="button">Back</button> <button type="button" id="reviewContinue">Continue</button></div>
+</div>
+
+<!-- Payment page -->
+<div id="payment" class="box" hidden>
+  <h2>Payment Methods</h2>
+  <div style="display:flex;gap:16px">
+    <div id="pay-menu" style="width:260px">
+      <div class="bank-type" data-cat="ipay"><span>IRCTC iPay (Credit Card/Debit Card/UPI)</span></div>
+      <div class="bank-type" data-cat="mps"><span>Multiple Payment Service</span></div>
+      <div class="bank-type" data-cat="upi"><span>BHIM/ UPI/ USSD</span></div>
+    </div>
+    <div id="pay-options"></div>
+  </div>
+  <div><button type="button">Back</button> <button type="button" id="payBook" class="btn btn-primary">Pay &amp; Book</button></div>
+</div>
+
+<h4>Angular-like model (updated only via DOM events)</h4>
+<div id="model"></div>
+
+<script>
+const model = { passengers: [], infants: [], mobileNumber: "9876500000", autoUpgradationSelected: false, bookOnlyIfCnf: false, reservationChoice: null, coachId: "", travelInsuranceOpted: null, paymentType: null, continueClicked: false };
+const render = () => (document.getElementById("model").textContent = JSON.stringify(model, null, 1));
+window.__mockModel = model;
+
+const opt = (v, t) => `<option value="${v}">${t}</option>`;
+const COUNTRIES = ["India", "Nepal", "United States", "United Kingdom"];
+
+function bindText(el, obj, key) { el.addEventListener("input", () => { obj[key] = el.value; render(); }); }
+function bindSelect(el, obj, key) { el.addEventListener("change", () => { obj[key] = el.value; render(); }); }
+
+function addPassengerRow() {
+  if (model.passengers.length >= 6) return;
+  const m = { passengerName: "", passengerAge: "", passengerGender: "", passengerNationality: "IN", passengerBerthChoice: "", passengerFoodChoice: "" };
+  model.passengers.push(m);
+  const row = document.createElement("app-passenger");
+  row.innerHTML = `<div class="ui-g">
+    <span>${model.passengers.length}</span>
+    <p-autocomplete formcontrolname="passengerName"><span class="ui-autocomplete ui-widget" style="position:relative"><input class="ui-inputtext" type="text" placeholder="Name" maxlength="16" autocomplete="off"></span></p-autocomplete>
+    <input type="number" formcontrolname="passengerAge" placeholder="Age" min="1" max="125">
+    <select formcontrolname="passengerGender">${opt("", "Gender")}${opt("M", "Male")}${opt("F", "Female")}${opt("T", "Transgender")}</select>
+    <select formcontrolname="passengerNationality">${COUNTRIES.map((c) => opt(c === "India" ? "IN" : c.slice(0, 2).toUpperCase(), c)).join("")}</select>
+    <select formcontrolname="passengerBerthChoice">${opt("", "Berth Preference")}${opt("LB", "Lower")}${opt("MB", "Middle")}${opt("UB", "Upper")}${opt("SL", "Side Lower")}${opt("SU", "Side Upper")}</select>
+    <select formcontrolname="passengerFoodChoice">${opt("", "Food Choice")}${opt("V", "Veg")}${opt("N", "Non Veg")}${opt("J", "Jain Meal")}${opt("D", "No Food")}</select>
+  </div>`;
+  const name = row.querySelector("input.ui-inputtext");
+  bindText(name, m, "passengerName");
+  // fake autocomplete suggestions from a "master list"
+  name.addEventListener("input", () => {
+    row.querySelector(".ui-autocomplete-panel")?.remove();
+    if (name.value.length < 2) return;
+    const panel = document.createElement("div");
+    panel.className = "ui-autocomplete-panel";
+    panel.innerHTML = `<ul class="ui-autocomplete-items"><li>${name.value.toUpperCase()} (master list)</li></ul>`;
+    name.parentElement.appendChild(panel);
+  });
+  name.addEventListener("keydown", (e) => { if (e.key === "Escape") row.querySelector(".ui-autocomplete-panel")?.remove(); });
+  bindText(row.querySelector("[formcontrolname=passengerAge]"), m, "passengerAge");
+  bindSelect(row.querySelector("[formcontrolname=passengerGender]"), m, "passengerGender");
+  bindSelect(row.querySelector("[formcontrolname=passengerNationality]"), m, "passengerNationality");
+  bindSelect(row.querySelector("[formcontrolname=passengerBerthChoice]"), m, "passengerBerthChoice");
+  bindSelect(row.querySelector("[formcontrolname=passengerFoodChoice]"), m, "passengerFoodChoice");
+  document.getElementById("passenger-rows").appendChild(row);
+  render();
+}
+
+function addInfantRow() {
+  const m = { name: "", age: "", gender: "" };
+  model.infants.push(m);
+  const row = document.createElement("app-infant");
+  row.innerHTML = `<div class="ui-g"><span>Infant ${model.infants.length}</span>
+    <input type="text" formcontrolname="infantName" placeholder="Name" maxlength="16">
+    <select formcontrolname="age">${opt("", "Age")}${opt("0", "Below one year")}${opt("1", "One year")}${opt("2", "Two years")}${opt("3", "Three years")}${opt("4", "Four years")}</select>
+    <select formcontrolname="gender">${opt("", "Gender")}${opt("M", "Male")}${opt("F", "Female")}${opt("T", "Transgender")}</select></div>`;
+  bindText(row.querySelector("input"), m, "name");
+  bindSelect(row.querySelector("[formcontrolname=age]"), m, "age");
+  bindSelect(row.querySelector("[formcontrolname=gender]"), m, "gender");
+  document.getElementById("infant-rows").appendChild(row);
+  render();
+}
+
+// simulate async rendering of added rows like Angular change detection
+document.getElementById("add-psgn").addEventListener("click", () => setTimeout(addPassengerRow, 120));
+document.getElementById("add-infant").addEventListener("click", () => setTimeout(addInfantRow, 120));
+
+document.getElementById("mobileNumber").addEventListener("input", (e) => { model.mobileNumber = e.target.value; render(); });
+document.getElementById("autoUpgradation").addEventListener("change", (e) => { model.autoUpgradationSelected = e.target.checked; render(); });
+document.querySelector("[formcontrolname=coachId]").addEventListener("input", (e) => { model.coachId = e.target.value; render(); });
+document.querySelector("p-checkbox .ui-chkbox-box").addEventListener("click", (e) => {
+  model.bookOnlyIfCnf = !model.bookOnlyIfCnf;
+  e.target.classList.toggle("ui-state-active", model.bookOnlyIfCnf);
+  render();
+});
+
+// PrimeNG-like dropdown: options exist only while open
+(function () {
+  const host = document.getElementById("resChoice");
+  const choices = ["None", "Book only if at least 1 lower berth is allotted.", "Book only if 2 lower berths are allotted.", "Book, only if all berths are allotted in same coach."];
+  host.innerHTML = `<div class="ui-dropdown ui-widget"><label class="ui-dropdown-label">Reservation Choice</label><div class="ui-dropdown-trigger">▼</div></div>`;
+  const dd = host.querySelector(".ui-dropdown");
+  dd.addEventListener("click", (e) => {
+    if (e.target.classList.contains("ui-dropdown-item")) return;
+    const open = dd.querySelector(".ui-dropdown-panel");
+    if (open) return open.remove();
+    const panel = document.createElement("div");
+    panel.className = "ui-dropdown-panel";
+    panel.innerHTML = `<ul class="ui-dropdown-items">${choices.map((c) => `<li class="ui-dropdown-item" role="option">${c}</li>`).join("")}</ul>`;
+    panel.addEventListener("click", (ev) => {
+      const li = ev.target.closest("li");
+      if (!li) return;
+      model.reservationChoice = li.textContent;
+      dd.querySelector(".ui-dropdown-label").textContent = li.textContent;
+      panel.remove();
+      render();
+      ev.stopPropagation();
+    });
+    dd.appendChild(panel);
+  });
+})();
+
+function primeRadio(container, name, value, label, key) {
+  const el = document.createElement("p-radiobutton");
+  el.setAttribute("name", name);
+  el.setAttribute("value", value);
+  el.innerHTML = `<div class="ui-radiobutton ui-widget"><div class="ui-helper-hidden-accessible"><input type="radio" name="${name}" value="${value}"></div><div class="ui-radiobutton-box ui-widget ui-state-default"></div></div><label class="ui-radiobutton-label">${label}</label>`;
+  el.querySelector(".ui-radiobutton-box").addEventListener("click", () => {
+    container.querySelectorAll(".ui-radiobutton-box").forEach((b) => b.classList.remove("ui-state-active"));
+    el.querySelector(".ui-radiobutton-box").classList.add("ui-state-active");
+    model[key] = value;
+    render();
+  });
+  const wrap = document.createElement("div");
+  wrap.appendChild(el);
+  container.appendChild(wrap);
+}
+primeRadio(document.getElementById("ins"), "travelInsuranceOpted-0", "true", "Yes, and I accept the terms &amp; conditions", "travelInsuranceOpted");
+primeRadio(document.getElementById("ins"), "travelInsuranceOpted-0", "false", "No, I don't want travel insurance", "travelInsuranceOpted");
+primeRadio(document.getElementById("pay"), "paymentType", "3", "Credit &amp; Debit cards / Net Banking / Wallets / EMI / UPI", "paymentType");
+primeRadio(document.getElementById("pay"), "paymentType", "2", "Pay through BHIM/UPI", "paymentType");
+model.page = "passenger"; model.gatewayCategory = null; model.gatewayOption = null; model.payBookClicked = false; model.reviewContinueClicked = false;
+const BASE = "/test/mock/nget";
+// Rotating header banner: swaps elements constantly (IRCTC's LOYALTY / Cashback banner).
+(function () {
+  const host = document.createElement("div"); host.id = "banner"; document.body.prepend(host);
+  let i = 0; setInterval(() => { host.innerHTML = `<span>${++i % 2 ? "LOYALTY" : "Upto 10% Cashback"}</span>`; }, 700);
+})();
+// Header clock: text-only change every second, like IRCTC's.
+setInterval(() => { document.getElementById("clock").textContent = new Date().toLocaleTimeString(); }, 1000);
+const loader = (on) => { const l = document.getElementById("preloaders"); l.hidden = !on; l.style.display = on ? "grid" : "none"; };
+loader(false);
+const delay = () => window.__mockDelay || 400;
+document.getElementById("continueBtn").addEventListener("click", () => {
+  model.continueClicked = true;
+  model.continueClicks = (model.continueClicks || 0) + 1;
+  if (window.__mockRejectContinue) { render(); return; }  // simulate IRCTC validation error
+  loader(true);
+  setTimeout(() => {
+    loader(false);
+    document.getElementById("psgn-form").hidden = true;
+    document.getElementById("review").hidden = false;
+    // Review data + Continue button render late on slow days
+    const rc = document.getElementById("reviewContinue");
+    rc.hidden = true; loader(true);
+    setTimeout(() => { rc.hidden = false; loader(false); }, Math.min(delay(), 4000));
+    document.getElementById("captcha-wrap").hidden = !window.__mockCaptcha;
+    document.getElementById("review-summary").textContent = model.passengers.map((p, i) => `${i + 1} ${p.passengerName} ${p.passengerAge} yrs`).join(" | ");
+    history.pushState(null, "", BASE + "/booking/reviewBooking");
+    model.page = "review"; render();
+  }, delay());
+});
+document.getElementById("reviewContinue").addEventListener("click", () => {
+  model.reviewContinueClicked = true;
+  model.reviewContinueClicks = (model.reviewContinueClicks || 0) + 1;
+  loader(true);
+  setTimeout(() => {
+    loader(false);
+    document.getElementById("review").hidden = true;
+    history.pushState(null, "", BASE + "/payment/bkgPaymentOptions");
+    model.page = "payment"; render();
+    // payment view renders a bit later, like the real page
+    setTimeout(() => { document.getElementById("payment").hidden = false; }, 700);
+  }, delay());
+});
+const PAY_OPTS = { ipay: ["IRCTC iPay New"], mps: ["Paytm", "PhonePe"], upi: ["Amazon Pay", "Paytm UPI"] };
+document.querySelectorAll(".bank-type").forEach((el) => el.addEventListener("click", () => {
+  document.querySelectorAll(".bank-type").forEach((x) => (x.style.background = ""));
+  el.style.background = "#ddd";
+  model.gatewayCategory = el.textContent.trim(); model.gatewayOption = null; render();
+  setTimeout(() => {
+    const box = document.getElementById("pay-options");
+    box.innerHTML = PAY_OPTS[el.dataset.cat].map((o) => `<div class="pay-opt" style="border:1px solid #ccc;padding:10px;margin:4px;cursor:pointer"><span>${o}</span></div>`).join("");
+    box.querySelectorAll(".pay-opt").forEach((o) => o.addEventListener("click", () => {
+      box.querySelectorAll(".pay-opt").forEach((x) => (x.style.borderColor = "#ccc"));
+      o.style.borderColor = "#f26b1d"; model.gatewayOption = o.textContent.trim(); render();
+    }));
+  }, 300);
+}));
+document.getElementById("payBook").addEventListener("click", () => { model.payBookClicked = true; render(); });
+
+// IRCTC renders the first passenger row after its data loads
+setTimeout(addPassengerRow, 600);
+render();
+</script>
+
+<!-- Test harness: stub the extension messaging API, then load the real content scripts. -->
+<script>
+window.__listeners = [];
+window.__sent = [];
+window.chrome = {
+  runtime: {
+    getManifest: () => ({ version: "test" }),
+    sendMessage: (m) => { window.__sent.push(m); return Promise.resolve(); },
+    onMessage: { addListener: (fn) => window.__listeners.push(fn) },
+  },
+  // in-memory storage seeded with sample profiles (for the in-page panel)
+  storage: (function () {
+    const store = {
+      passengers: [
+        { id: "p1", type: "passenger", name: "Ravi Kumar", age: 34, gender: "Male", nationality: "India", berth: "Lower", food: "Veg" },
+        { id: "p2", type: "passenger", name: "Anita Kumar", age: 31, gender: "Female", nationality: "India", berth: "Side Upper", food: "No Preference" },
+        { id: "p3", type: "infant_without_berth", name: "Baby Kumar", age: 1, gender: "Female", nationality: "India", berth: "No Preference", food: "No Preference" },
+      ],
+      groups: [{ id: "g1", name: "Couple", passengerIds: ["p1", "p2"] }],
+      settings: { contact: { mobile: "9123456789", email: "", overwriteExisting: false }, preferences: { autoUpgrade: true, confirmBerths: true, reservationChoice: "two_lower", coachNumber: "B2" }, insurance: "no", paymentMode: "upi", ui: { autoShowPanel: true } },
+      selection: { mode: "passengers", passengerIds: ["p1", "p2", "p3"], groupId: "" },
+    };
+    const ls = [];
+    window.__store = store;
+    return {
+      local: {
+        async get(keys) { const o = {}; [].concat(keys).forEach((k) => { if (k in store) o[k] = JSON.parse(JSON.stringify(store[k])); }); return o; },
+        async set(items) { const ch = {}; for (const [k, v] of Object.entries(items)) { ch[k] = { newValue: v }; store[k] = JSON.parse(JSON.stringify(v)); } ls.forEach((f) => f(ch, "local")); },
+      },
+      onChanged: { addListener: (f) => ls.push(f) },
+    };
+  })(),
+};
+window.__send = (msg) => new Promise((resolve) => {
+  const async = window.__listeners[0](msg, {}, resolve);
+  if (!async) {/* sync responders already resolved */}
+});
+</script>
+<script src="/content/dom-utils.js"></script>
+<script src="/content/detector.js"></script>
+<script src="/content/panel.js"></script>
+<script src="/content/filler.js"></script>
+<script src="/content/autoflow.js"></script>
+<script src="/content.js"></script>
+</body>
+</html>
