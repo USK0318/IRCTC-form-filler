@@ -112,6 +112,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     selectGateway: true, // on the Payment page, pick the method below (never Pay & Book)
     gatewayCategory: "BHIM/ UPI/ USSD",
     gatewayOption: "Paytm UPI",
+    clickPayBook: false, // opt-in: click "Pay & Book" after a countdown
+    payBookDelaySec: 5,
   },
 });
 

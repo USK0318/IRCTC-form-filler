@@ -8,8 +8,11 @@ the page and click **Continue**.
 If you turn on **After filling** (it's on by default), the extension also
 clicks **Continue** on the Passenger Details and Review Journey pages. On the
 Payment page it selects your chosen method, for example **BHIM/ UPI/ USSD →
-Paytm UPI**. It stops there: you always click **Pay & Book** yourself. It never
-types a CAPTCHA, OTP or login, and it never enters payment details.
+Paytm UPI**. By default it stops there and you click **Pay & Book**. If you
+turn on **Then click Pay & Book automatically**, it clicks Pay & Book once,
+after a countdown (5 s by default) that you can Cancel from the panel. You
+still approve the payment yourself in your UPI app. It never types a CAPTCHA,
+OTP or login, and it never enters payment details.
 
 ---
 
@@ -102,7 +105,8 @@ After you edit any file, click **↻ Reload** on the extension's card in
 4. Log in to IRCTC yourself, search for a train, and pick a class/date to reach **Passenger Details**.
 5. The **IRCTC Smart Filler** panel opens on the right side of the page by itself. Pick passengers or a group in it. (The toolbar popup's **Book** tab does the same thing.)
 6. Click **Fill & Continue**, or **Fill Form** if auto-continue is off. If anything is marked **!** or **✕**, it doesn't continue: fix those items and click Continue yourself.
-7. The extension moves through Review Journey and selects your payment method (default **BHIM/ UPI/ USSD → Paytm UPI**). Check the total, then click **Pay & Book** yourself.
+7. The extension moves through Review Journey and selects your payment method (default **BHIM/ UPI/ USSD → Paytm UPI**). Check the total, then click **Pay & Book**, or let the countdown click it if you turned that on.
+8. Approve the payment in your UPI app.
 
 **Clear Form** empties the passenger and infant rows (name, age, gender, berth,
 food) and the coach number. Contact details, preferences, insurance and
@@ -169,6 +173,6 @@ field. The fix usually goes in `KIND` / `isNameInput` / `isAgeInput`
 
 ## Limitations (by design)
 
-- No CAPTCHA, OTP or login automation, no clicking **Pay & Book**, no payment details, and no rate-limit or anti-bot bypass. The only automatic clicks are Continue (each at most once per booking, after a clean fill) and the payment-method selection.
+- No CAPTCHA, OTP or login automation, no payment details or UPI PIN, and no rate-limit or anti-bot bypass. The only automatic clicks are Continue (at most once per page, after a clean fill), the payment-method selection and, only if you turned it on, Pay & Book (once, after a countdown you can cancel). The payment is always approved by you in your UPI app.
 - IRCTC enforces its own rules: names of 3–16 letters, a maximum of 6 passengers (4 for Tatkal), and class-specific berth or food options. The extension validates these in advance, but IRCTC has the final say.
 - Child-berth, senior-concession and similar options that IRCTC shows after you enter an age are flagged in the report for you to choose manually.

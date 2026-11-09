@@ -86,7 +86,7 @@
   let data = { passengers: [], groups: [], settings: null, selection: { mode: "passengers", passengerIds: [], groupId: "" } };
   let minimized = false;
   let lastStatus = null; // {kind:'progress', text} | {kind:'report', report}
-  let flowMsg = null; // {text, tone} from autoflow.js
+  let flowMsg = null; // {text, tone, action?} from autoflow.js
 
   /* ------------------------------ helpers ---------------------------- */
 
@@ -297,6 +297,11 @@
     const el = h("div", { class: `flow ${flowMsg.tone}` });
     if (flowMsg.tone === "progress") el.append(h("span", { class: "spin" }));
     el.append(flowMsg.text);
+    if (flowMsg.action) {
+      const act = flowMsg.action;
+      el.append(h("div", { class: "actions", style: "margin-top:8px" },
+        h("button", { class: "btn ghost", onclick: () => { act.onClick(); flowMsg = { text: "Cancelling…", tone: "info" }; render(); } }, act.label)));
+    }
     body.append(el);
   }
 
@@ -354,8 +359,8 @@
   }
 
   /** Step messages from autoflow.js (works on any IRCTC page). */
-  async function message(text, tone = "info") {
-    flowMsg = { text, tone };
+  async function message(text, tone = "info", action = null) {
+    flowMsg = { text, tone, action };
     if (!root) {
       ensureHost();
       await loadData();

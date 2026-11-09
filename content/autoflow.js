@@ -57,6 +57,8 @@
         selectGateway: true,
         gatewayCategory: "BHIM/ UPI/ USSD",
         gatewayOption: "Paytm UPI",
+        clickPayBook: false,
+        payBookDelaySec: 5,
         ...((settings && settings.autoFlow) || {}),
       };
     } catch (_) {
@@ -118,9 +120,9 @@
   }
 
   /** Real-user-like click: scroll into view, pointer/mouse sequence, then a single click. */
-  function clickLikeUser(el) {
+  function clickLikeUser(el, { allowPayment = false } = {}) {
     const t = norm(el.innerText || el.value || el.textContent);
-    if (FORBIDDEN.test(t)) throw new Error("refused: payment-submitting control");
+    if (!allowPayment && FORBIDDEN.test(t)) throw new Error("refused: payment-submitting control");
     try {
       el.scrollIntoView({ block: "center", behavior: "instant" });
     } catch (_) {}
@@ -325,7 +327,7 @@
     await sleep(500);
 
     if (!cfg.gatewayOption) {
-      tell(`${cfg.gatewayCategory} selected. Check the total, then click Pay & Book yourself.`, "ok");
+      await maybePayAndBook(cfg, `${cfg.gatewayCategory} selected.`);
       return;
     }
     const option = await waitWithProgress(() => findByCompactText(cfg.gatewayOption, { maxLen: 40 }), 30000, `Payment: waiting for ${cfg.gatewayOption}…`);
@@ -336,7 +338,62 @@
     await waitForIdle({ timeout: 8000 });
     safeClick(findByCompactText(cfg.gatewayOption, { maxLen: 40 }) || option);
     await sleep(300);
-    tell(`${cfg.gatewayCategory} → ${cfg.gatewayOption} selected. Check the total fare, then click Pay & Book yourself.`, "ok");
+    await maybePayAndBook(cfg, `${cfg.gatewayCategory} → ${cfg.gatewayOption} selected.`);
+  }
+
+  function payBookButton({ allowDisabled = false } = {}) {
+    return (
+      Array.from(document.querySelectorAll("button, input[type=submit], input[type=button], a.btn, [role=button]")).find((b) => {
+        if (inOverlay(b) || !isVisible(b)) return false;
+        if (!allowDisabled && isDisabled(b)) return false;
+        return /^pay ?& ?book$|^pay and book$/.test(norm(b.innerText || b.value || b.textContent));
+      }) || null
+    );
+  }
+
+  /**
+   * Optional final step (Settings → After filling → "Click Pay & Book").
+   * Shows a countdown with Cancel, then clicks Pay & Book exactly once.
+   * The payment itself still has to be approved by the user in their UPI app.
+   */
+  async function maybePayAndBook(cfg, selectedText) {
+    if (!cfg.clickPayBook) {
+      tell(`${selectedText} Check the total fare, then click Pay & Book yourself.`, "ok");
+      return;
+    }
+    if (captchaVisible()) {
+      tell(`${selectedText} A CAPTCHA is shown: type it and click Pay & Book yourself.`, "warn");
+      return;
+    }
+    const btn = await waitFor(() => payBookButton({ allowDisabled: true }), { timeout: 15000 });
+    if (!btn) {
+      tell(`${selectedText} Couldn't find Pay & Book. Click it yourself.`, "warn");
+      return;
+    }
+    if (isDisabled(btn) && !(await waitFor(() => (isDisabled(btn) ? null : btn), { timeout: 10000 }))) {
+      tell(`${selectedText} Pay & Book is greyed out. Check the page and click it yourself.`, "warn");
+      return;
+    }
+
+    const startHref = location.href;
+    const secs = Math.max(0, Math.min(30, Number(cfg.payBookDelaySec) || 0));
+    let cancelled = false;
+    const cancel = { label: "Cancel", onClick: () => { cancelled = true; } };
+    for (let left = secs; left > 0 && !cancelled; left--) {
+      NS.panel?.message(`${selectedText} Clicking Pay & Book in ${left}s…`, "warn", cancel);
+      await sleep(1000);
+    }
+    if (cancelled) {
+      tell("Pay & Book cancelled. Check the total fare and click it yourself when ready.", "info");
+      return;
+    }
+    const target = payBookButton();
+    if (!target || location.href !== startHref || !isPaymentPage()) {
+      tell("The page changed during the countdown, so Pay & Book was not clicked.", "warn");
+      return;
+    }
+    clickLikeUser(target, { allowPayment: true });
+    tell("Pay & Book clicked. Approve the payment in your UPI app (Paytm). Don't refresh this page.", "ok");
   }
 
   let running = false;

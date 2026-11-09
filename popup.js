@@ -514,6 +514,16 @@ function renderSettings() {
   $("#st-gateway").checked = !!s.autoFlow.selectGateway;
   $("#st-gw-category").value = s.autoFlow.gatewayCategory;
   $("#st-gw-option").value = s.autoFlow.gatewayOption;
+  $("#st-paybook").checked = !!s.autoFlow.clickPayBook;
+  $("#st-paybook-delay").value = s.autoFlow.payBookDelaySec ?? 5;
+  syncPayBook();
+}
+
+function syncPayBook() {
+  const gw = $("#st-gateway").checked;
+  $("#st-paybook").disabled = !gw;
+  if (!gw) $("#st-paybook").checked = false;
+  $("#st-paybook-delay-wrap").hidden = !$("#st-paybook").checked;
 }
 
 async function onSaveSettings(e) {
@@ -546,6 +556,8 @@ async function onSaveSettings(e) {
       selectGateway: $("#st-gateway").checked,
       gatewayCategory: $("#st-gw-category").value,
       gatewayOption: $("#st-gw-option").value.trim() || "Paytm UPI",
+      clickPayBook: $("#st-gateway").checked && $("#st-paybook").checked,
+      payBookDelaySec: Math.max(0, Math.min(30, parseInt($("#st-paybook-delay").value, 10) || 0)),
     },
   });
   toast("Settings saved.", "ok");
@@ -616,6 +628,8 @@ function bindStatic() {
   $("#group-form").addEventListener("submit", onSaveGroup);
 
   $("#settings-form").addEventListener("submit", onSaveSettings);
+  $("#st-gateway").addEventListener("change", syncPayBook);
+  $("#st-paybook").addEventListener("change", syncPayBook);
   $("#btn-wipe").addEventListener("click", (e) =>
     confirmClick(e.currentTarget, "Click again to delete everything", async () => {
       await clearAllData();

@@ -205,7 +205,15 @@
               <datalist id="gw-option-list"></datalist>
             </label>
           </div>
-          <p class="hint">It stops before <b>Pay &amp; Book</b>, which you always click yourself. If a CAPTCHA appears, type it and click Continue yourself; the payment method is still picked on the next page.</p>
+          <label class="check">
+            <input type="checkbox" id="st-paybook" />
+            <span>Then click <b>Pay &amp; Book</b> automatically</span>
+          </label>
+          <label class="field" id="st-paybook-delay-wrap">
+            <span>Countdown before Pay &amp; Book <small>(seconds, 0–30 — you can Cancel during it)</small></span>
+            <input id="st-paybook-delay" type="number" min="0" max="30" inputmode="numeric" />
+          </label>
+          <p class="hint" id="st-paybook-hint">Off: it stops before <b>Pay &amp; Book</b> and you click it. On: it clicks Pay &amp; Book once after the countdown; you still approve the payment in your UPI app. If a CAPTCHA appears, type it and click Continue yourself; the flow carries on from the next page.</p>
         </div>
 
         <div class="card form">
